@@ -97,6 +97,10 @@ class CoCoInspector():
     def image_ids(self):
         return list(self.coco_gt.imgs.keys())
 
+    def filter_imgs_by_cat(self, cat):
+        catid = self.cat2id[cat]
+        return self.coco_gt.catToImgs[catid]
+
     def get_random_images_with_category(self, category):
         allanno = self.coco_gt.loadAnns(self.coco_gt.getAnnIds())
         image_ids = [a['image_id'] for a in allanno if a['category_id'] == self.cat2id[category]]

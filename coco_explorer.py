@@ -74,18 +74,18 @@ def app(args):
                                             options=[c['name'] for c in inspector.categories])
             print(category)
             if category:
-                random_ids = inspector.get_random_images_with_category(category)
-                for id in random_ids[:10]:
-                    print(id)
-                    f, fn = inspector.visualize_image(id,
-                                                      draw_gt_mask=draw_gt_mask,
-                                                      draw_pred_mask=draw_pred_mask,
-                                                      score_threshold=score,
-                                                      show_only=[vis_options[o] for o in ms],
-                                                      fontsize=30,
-                                                      figsize=(20, 20))
-
-                    st.pyplot(f[0])
+                imgids = inspector.filter_imgs_by_cat(category)
+                imgid = st.select_slider("Slider trough images with selected category", imgids)
+                f, fn = inspector.visualize_image(imgid,
+                                                  draw_gt_mask=draw_gt_mask,
+                                                  draw_pred_mask=draw_pred_mask,
+                                                  score_threshold=score,
+                                                  show_only=[vis_options[o] for o in ms],
+                                                  fontsize=33,
+                                                  figsize=(15, 15))
+                st.image(fn, use_column_width=True)
+                imscores = inspector.image_scores_agg
+                st.dataframe(imscores.loc[inspector.image_ids[]])
 
         if r == 'precision':
             st.text("""
