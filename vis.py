@@ -66,7 +66,8 @@ def vis_image(img,
         if ann['type'] not in show_only or ann.get('score', 1) < score_threshold:
             continue
 
-        bbox = change_box_order(np.array([ann['bbox']]), input_order='tlwh', output_order='tlwh')
+        bbox = np.array(
+            [ann["bbox"]]) #change_box_order(np.array([ann['bbox']]), input_order='tlwh', output_order='tlwh')
         x, y, w, h = bbox[0]
         ann_type = ann.get('type')
         label = ann.get('label')

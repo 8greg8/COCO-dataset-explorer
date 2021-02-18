@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-from pycoco import COCOeval
+# from pycoco import COCOeval
+from pycocotools.cocoeval import COCOeval
 from vis import vis_image
 import matplotlib.pyplot as plt
 
@@ -24,24 +25,34 @@ class Capturing(list):
 
 class CoCoInspector():
 
-    def __init__(self, coco_gt, coco_det=None, base_path=None, iou='bbox', *args, **kwargs):
+    def __init__(self, coco_gt, coco_det=None, base_path=None, iou='bbox', catids=None,
+        imgids=None, *args, **kwargs):
         self.coco_gt = coco_gt
         self.coco_dt = coco_det
         self.cocoeval = None
-        self.iou = 'bbox'
+        self.iou = iou
         self.base_path = base_path
         self.cat2id = dict([(v['name'], v['id']) for v in self.coco_dt.cats.values()])
 
         self.threshold = 0.3  # default per image scoring threshold
+        self.catids = catids
+        self.imgids = imgids
 
     def evaluate(self):
         if self.coco_gt and self.coco_dt:
             self.cocoeval = COCOeval(self.coco_gt, self.coco_dt, self.iou)
+            
+            self.cocoeval.params.imgIds = self.imgids
+            self.cocoeval.params.catIds = self.catids
+            self.cocoeval.params.iouThrs = [
+                0.25
+            ]  # np.linspace(0, 0.95, int(np.round((0.95 - 0) / 0.05)) + 1, endpoint=True)
+
             self.cocoeval.evaluate()
             self.cocoeval.accumulate()
             with Capturing() as capture:
                 self.cocoeval.summarize()
-            self.pcp = self.cocoeval.per_class_precisions
+            #self.pcp = self.cocoeval.per_class_precisions
             self.cocoeval_scores = '\n'.join(capture)
             self.image_scores_agg, self.image_scores = self.per_image_scores(self.threshold)
 
@@ -111,10 +122,18 @@ class CoCoInspector():
         categories = [{'name': v['name'], 'id': v['id']} for v in self.coco_dt.cats.values()]
         return sorted(categories, key=lambda x: x['id'])
 
-    @staticmethod
-    def _get_detections(coco, image_id):
-        annotations = coco.loadAnns(coco.getAnnIds(imgIds=image_id))
-        return annotations
+    def _get_detections(self, coco, image_id):
+        annotations = coco.loadAnns(
+            coco.getAnnIds(imgIds=image_id, catIds=self.catids)
+        )
+        collect = []
+        for a in annotations:
+            a["label"] = self.coco_gt.cats[a["category_id"]]["name"]
+            if "score" not in a and a["id"]:
+                a["type"] = "gt"
+            # if not a["is_occluded"]:
+            collect.append(a)
+        return collect
 
     def _imageid2name(self, image_id):
         return self.coco_gt.loadImgs(ids=[image_id])[0]['file_name']

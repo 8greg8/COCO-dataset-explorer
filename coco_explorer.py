@@ -7,15 +7,50 @@ from pycocotools.coco import COCO
 
 from cocoinspector import CoCoInspector
 
+@st.cache(allow_output_mutation=True)
+def get_coco(coco_train):
+    return COCO(coco_train)
+
 
 @st.cache(allow_output_mutation=True)
-def get_inspector(coco_train, coco_predictions, images_path):
+def get_inspector(coco_train, coco_predictions, images_path, iou, catids):
     coco = COCO(coco_train)
-    coco_dt = coco.loadRes(coco_predictions)
-    inspector = CoCoInspector(coco, coco_dt, base_path=images_path)
-    inspector.evaluate()
+    # catids = coco.getCatIds()
+    imgids = extract_imgids(coco, catids)
+    print(f"Selected images {len(imgids)}/{len(coco.imgs)}")
+    coco_dt = coco_dt = (
+        coco.loadRes(coco_predictions) if coco_predictions else None
+    )
+    inspector = CoCoInspector(
+        coco,
+        coco_dt,
+        base_path=images_path,
+        iou=iou,
+        catids=catids,
+        imgids=imgids,
+    )
     inspector.calculate_stats()
-    return inspector
+
+    if coco_dt:
+        inspector.evaluate()
+
+    return inspector, imgids
+
+
+def extract_imgids(coco, catids):
+    imgids = set()
+    for catid in catids:
+        if catid in coco.catToImgs:
+            imgs = coco.catToImgs[catid]
+            imgids.update(imgs)
+
+    return sorted(list(imgids))
+
+
+def get_catids(coco):
+    return coco.getCatIds()
+
+
 
 
 def app(args):
@@ -25,7 +60,22 @@ def app(args):
                                                          'inspect annotations',
                                                          'CoCo scores'
                                                          ])
-    inspector = get_inspector(args.coco_train, args.coco_predictions, args.images_path)
+
+    iou = st.sidebar.selectbox("Choose IOU evaluation method", ["segm", "bbox"])
+    """
+    s_catids = st.sidebar.multiselect(
+        label="Select categories",
+        options=catids,
+        default=[16, 21, 29],
+        format_func=format_funct,
+    )
+    """
+    s_catids = [17, 18, 19, 20, 21, 22, 23, 24, 31, 32, 33]
+
+    inspector, s_imgids = get_inspector(
+        args.coco_train, args.coco_predictions, args.images_path, iou, s_catids
+    )
+
     if topbox == 'inspect predictions visually':
 
         st.sidebar.subheader('Inspect predictions')
@@ -52,18 +102,24 @@ def app(args):
         draw_pred_mask = st.sidebar.checkbox("Draw predictions masks (red)")
         draw_gt_mask = st.sidebar.checkbox("Draw ground truth masks (green)")
 
+        fp_filter = st.sidebar.checkbox(
+            "Select images containing false positives."
+        )
+
         r = st.sidebar.radio('Inspect by', options=['image_id', 'category', 'precision'])
 
         if r == 'image_id':
-            r = st.slider('slider trough all images', min_value=0, max_value=len(inspector.image_ids))
+            r = st.select_slider("slider through selected images", s_imgids)
             st.text(inspector._imageid2path(inspector.image_ids[r]))
-            f, fn = inspector.visualize_image(inspector.image_ids[r],
-                                              draw_gt_mask=draw_gt_mask,
-                                              draw_pred_mask=draw_pred_mask,
-                                              score_threshold=score,
-                                              fontsize=33,
-                                              show_only=[vis_options[o] for o in ms],
-                                              figsize=(15, 15))
+            f, fn = inspector.visualize_image(
+                inspector.image_ids[r],
+                draw_gt_mask=draw_gt_mask,
+                draw_pred_mask=draw_pred_mask,
+                score_threshold=score,
+                fontsize=30,
+                show_only=[vis_options[o] for o in ms],
+                figsize=(20, 20),
+            )
 
             st.image(fn, use_column_width=True)
             imscores = inspector.image_scores_agg
@@ -85,7 +141,7 @@ def app(args):
                                                   figsize=(15, 15))
                 st.image(fn, use_column_width=True)
                 imscores = inspector.image_scores_agg
-                st.dataframe(imscores.loc[inspector.image_ids[]])
+                st.dataframe(imscores.loc[inspector.image_ids[imgid]])
 
         if r == 'precision':
             st.text("""
