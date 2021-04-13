@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from easyimages.utils import change_box_order
+#from easyimages.utils import change_box_order
 
 
 def vis_image(img,

@@ -1,11 +1,12 @@
 import argparse
-
+import time
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 from pycocotools.coco import COCO
 
 from cocoinspector import CoCoInspector
+
 
 @st.cache(allow_output_mutation=True)
 def get_coco(coco_train):
@@ -18,7 +19,7 @@ def get_inspector(coco_train, coco_predictions, images_path, iou, catids):
     # catids = coco.getCatIds()
     imgids = extract_imgids(coco, catids)
     print(f"Selected images {len(imgids)}/{len(coco.imgs)}")
-    coco_dt = coco_dt = (
+    coco_dt = (
         coco.loadRes(coco_predictions) if coco_predictions else None
     )
     inspector = CoCoInspector(
@@ -50,11 +51,15 @@ def extract_imgids(coco, catids):
 def get_catids(coco):
     return coco.getCatIds()
 
-
-
-
 def app(args):
+
+    # Main input data
+    coco = get_coco(args.coco_train)
+    
+    # Main configuration
     st.title('COCO Explorer')
+    st.sidebar.header("Configuration")
+
     topbox = st.sidebar.selectbox("Choose what to do ", ['inspect predictions visually',
                                                          'inspect image statistics',
                                                          'inspect annotations',
@@ -62,28 +67,28 @@ def app(args):
                                                          ])
 
     iou = st.sidebar.selectbox("Choose IOU evaluation method", ["segm", "bbox"])
-    """
+
+    def format_cats(catid):
+        cat = coco.cats[catid]
+        return cat["name"]
     s_catids = st.sidebar.multiselect(
         label="Select categories",
-        options=catids,
-        default=[16, 21, 29],
-        format_func=format_funct,
-    )
-    """
-    s_catids = [17, 18, 19, 20, 21, 22, 23, 24, 31, 32, 33]
-
-    inspector, s_imgids = get_inspector(
-        args.coco_train, args.coco_predictions, args.images_path, iou, s_catids
+        options=coco.getCatIds(),
+        default=[17, 22, 31],
+        format_func=format_cats
     )
 
+    inspector, s_imgids = get_inspector(args.coco_train, args.coco_predictions, args.images_path, iou, s_catids)
+
+    st.sidebar.header("Parameters")
     if topbox == 'inspect predictions visually':
 
         st.sidebar.subheader('Inspect predictions')
 
         vis_options = {'true positives': 'tp',
-                       'ground truth': 'gt',
-                       'false positives': 'fp',
-                       }
+                    'ground truth': 'gt',
+                    'false positives': 'fp',
+                    }
 
         st.sidebar.text("""
         What to show on image
@@ -110,9 +115,9 @@ def app(args):
 
         if r == 'image_id':
             r = st.select_slider("slider through selected images", s_imgids)
-            st.text(inspector._imageid2path(inspector.image_ids[r]))
+            st.text(inspector._imageid2path(r))
             f, fn = inspector.visualize_image(
-                inspector.image_ids[r],
+                r,
                 draw_gt_mask=draw_gt_mask,
                 draw_pred_mask=draw_pred_mask,
                 score_threshold=score,
@@ -123,7 +128,7 @@ def app(args):
 
             st.image(fn, use_column_width=True)
             imscores = inspector.image_scores_agg
-            st.dataframe(imscores.loc[inspector.image_ids[r]])
+            st.dataframe(imscores.loc[r])
 
         if r == 'category':
             category = st.sidebar.selectbox(label='select by category',
@@ -133,12 +138,12 @@ def app(args):
                 imgids = inspector.filter_imgs_by_cat(category)
                 imgid = st.select_slider("Slider trough images with selected category", imgids)
                 f, fn = inspector.visualize_image(imgid,
-                                                  draw_gt_mask=draw_gt_mask,
-                                                  draw_pred_mask=draw_pred_mask,
-                                                  score_threshold=score,
-                                                  show_only=[vis_options[o] for o in ms],
-                                                  fontsize=33,
-                                                  figsize=(15, 15))
+                                                draw_gt_mask=draw_gt_mask,
+                                                draw_pred_mask=draw_pred_mask,
+                                                score_threshold=score,
+                                                show_only=[vis_options[o] for o in ms],
+                                                fontsize=33,
+                                                figsize=(15, 15))
                 st.image(fn, use_column_width=True)
                 imscores = inspector.image_scores_agg
                 st.dataframe(imscores.loc[inspector.image_ids[imgid]])
@@ -154,18 +159,18 @@ def app(args):
 
             for id in agg.index[:10]:
                 f, fn = inspector.visualize_image(id,
-                                                  draw_gt_mask=draw_gt_mask,
-                                                  draw_pred_mask=draw_pred_mask,
-                                                  score_threshold=score,
-                                                  show_only=[vis_options[o] for o in ms],
-                                                  fontsize=30,
-                                                  figsize=(20, 20))
+                                                draw_gt_mask=draw_gt_mask,
+                                                draw_pred_mask=draw_pred_mask,
+                                                score_threshold=score,
+                                                show_only=[vis_options[o] for o in ms],
+                                                fontsize=30,
+                                                figsize=(20, 20))
 
                 st.pyplot(f[0])
 
     elif topbox == 'inspect image statistics':
         st.plotly_chart(px.histogram(inspector.images_df, x='aspect_ratio', title='aspect ratio distribiution',
-                                     hover_name=inspector.images_df.file_name))
+                                    hover_name=inspector.images_df.file_name))
         st.plotly_chart(px.histogram(inspector.images_df, x='width', title='image width distribiution'))
         st.plotly_chart(px.histogram(inspector.images_df, x='height', title="image height distribiution"))
 

@@ -32,7 +32,8 @@ class CoCoInspector():
         self.cocoeval = None
         self.iou = iou
         self.base_path = base_path
-        self.cat2id = dict([(v['name'], v['id']) for v in self.coco_dt.cats.values()])
+
+        self.cat2id = dict([(v['name'], v['id']) for v in self.coco_gt.cats.values()])
 
         self.threshold = 0.3  # default per image scoring threshold
         self.catids = catids
