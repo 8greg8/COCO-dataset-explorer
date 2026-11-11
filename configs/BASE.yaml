@@ -1,0 +1,3 @@
+DATASET:
+  PATH: "/home/gregork/dataset/coco_parts_ts2"
+  IMG_FOLDER: "test"

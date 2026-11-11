@@ -1,0 +1,3 @@
+_BASE_: "BASE.yaml"
+GT: "test_parts.json"
+DT: "/home/gregork/workspace/robot-simulation/out/cnn/models/parts/ts2/anchor_sizes/test_0070999/eval/coco_instances_results.json"
